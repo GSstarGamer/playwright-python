@@ -151,6 +151,30 @@ class Expect:
         intervals: Optional[Sequence[float]] = None,
         message: Optional[str] = None,
     ) -> PollAssertions:
+        """
+        Poll the `callback` result until a matcher passes.
+
+        This mirrors Playwright Test's `expect.poll(...)` behavior from JavaScript:
+        repeatedly evaluate `callback` and retry assertions on the returned value
+        until success or timeout.
+
+        Args:
+            callback: Function returning the value to assert.
+            timeout: Timeout in milliseconds. Defaults to 5000. Pass `0` to disable timeout.
+            intervals: Polling intervals in milliseconds. Defaults to `[100, 250, 500, 1000]`.
+            message: Custom assertion message shown on failure.
+
+        Example:
+            ```py
+            counter = {"value": 0}
+            def get_value() -> int:
+                counter["value"] += 1
+                return counter["value"]
+
+            expect.poll(get_value, timeout=3000).to_be_greater_than_or_equal(3)
+            expect.poll(lambda: page.title()).to_match("Example")
+            ```
+        """
         return PollAssertions(
             callback=callback,
             timeout=timeout if timeout is not None else self._timeout,
