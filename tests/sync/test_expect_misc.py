@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import math
+import re
+
 import pytest
 
 from playwright.sync_api import Page, expect
@@ -70,3 +73,55 @@ def test_to_be_in_viewport_should_report_intersection_even_if_fully_covered_by_o
     """
     )
     expect(page.locator("h1")).to_be_in_viewport()
+
+
+def test_expect_poll_should_eventually_pass() -> None:
+    value = 0
+
+    def callback() -> int:
+        nonlocal value
+        value += 1
+        return value
+
+    expect.poll(callback, timeout=1_000, intervals=[10]).to_be_greater_than_or_equal(3)
+
+
+def test_expect_poll_should_support_not() -> None:
+    expect.poll(lambda: "done").not_to_be("pending")
+
+
+def test_expect_poll_should_use_custom_message_on_failure() -> None:
+    with pytest.raises(AssertionError) as exc_info:
+        expect.poll(
+            lambda: 1,
+            timeout=50,
+            intervals=[10],
+            message="custom-message",
+        ).to_be(2)
+    assert "custom-message" in str(exc_info.value)
+    assert "Last value: 1" in str(exc_info.value)
+
+
+def test_expect_poll_should_report_callback_error() -> None:
+    def callback() -> None:
+        raise ValueError("boom")
+
+    with pytest.raises(AssertionError) as exc_info:
+        expect.poll(callback, timeout=50, intervals=[10]).to_be(1)
+    assert "Last error: boom" in str(exc_info.value)
+
+
+def test_expect_poll_should_support_additional_matchers() -> None:
+    expect.poll(lambda: "alpha-beta").to_match(re.compile(r"alpha"))
+    expect.poll(lambda: "alpha-beta").to_match("beta")
+    expect.poll(lambda: "alpha-beta").to_start_with("alpha")
+    expect.poll(lambda: "alpha-beta").to_end_with("beta")
+    expect.poll(lambda: [1, 2, 3]).to_have_length(3)
+    expect.poll(lambda: None).to_be_none()
+    expect.poll(lambda: None).to_be_null()
+    expect.poll(lambda: 1).to_be_defined()
+    expect.poll(lambda: 1.234).to_be_close_to(1.23, 2)
+    expect.poll(lambda: math.nan).to_be_nan()
+    expect.poll(lambda: "hello").to_be_instance_of(str)
+    expect.poll(lambda: "").not_to_be_truthy()
+    expect.poll(lambda: "x").not_to_be_falsy()

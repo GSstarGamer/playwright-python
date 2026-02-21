@@ -18,7 +18,7 @@ Firefox and WebKit with a single API. Playwright is built to enable cross-browse
 web automation that is ever-green, capable, reliable and fast.
 """
 
-from typing import Any, Optional, Union, overload
+from typing import Any, Callable, Optional, Sequence, Union, overload
 
 import playwright._impl._api_structures
 import playwright._impl._errors
@@ -28,6 +28,7 @@ from playwright._impl._assertions import (
 )
 from playwright._impl._assertions import LocatorAssertions as LocatorAssertionsImpl
 from playwright._impl._assertions import PageAssertions as PageAssertionsImpl
+from playwright._impl._assertions import SyncPollAssertions as PollAssertions
 from playwright.sync_api._context_manager import PlaywrightContextManager
 from playwright.sync_api._generated import (
     APIRequest,
@@ -141,6 +142,21 @@ class Expect:
                 )
             )
         raise ValueError(f"Unsupported type: {type(actual)}")
+
+    def poll(
+        self,
+        callback: Callable[[], Any],
+        *,
+        timeout: Optional[float] = None,
+        intervals: Optional[Sequence[float]] = None,
+        message: Optional[str] = None,
+    ) -> PollAssertions:
+        return PollAssertions(
+            callback=callback,
+            timeout=timeout if timeout is not None else self._timeout,
+            intervals=intervals,
+            message=message,
+        )
 
 
 expect = Expect()

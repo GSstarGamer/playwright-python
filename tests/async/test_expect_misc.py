@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import math
+import re
+
 import pytest
 
 from playwright.async_api import Page, TimeoutError, expect
@@ -78,3 +81,57 @@ async def test_should_have_timeout_error_name(page: Page) -> None:
     with pytest.raises(TimeoutError) as exc_info:
         await page.wait_for_selector("#not-found", timeout=1)
     assert exc_info.value.name == "TimeoutError"
+
+
+async def test_expect_poll_should_eventually_pass() -> None:
+    value = 0
+
+    async def callback() -> int:
+        nonlocal value
+        value += 1
+        return value
+
+    await expect.poll(
+        callback, timeout=1_000, intervals=[10]
+    ).to_be_greater_than_or_equal(3)
+
+
+async def test_expect_poll_should_support_not() -> None:
+    await expect.poll(lambda: "done").not_to_be("pending")
+
+
+async def test_expect_poll_should_use_custom_message_on_failure() -> None:
+    with pytest.raises(AssertionError) as exc_info:
+        await expect.poll(
+            lambda: 1,
+            timeout=50,
+            intervals=[10],
+            message="custom-message",
+        ).to_be(2)
+    assert "custom-message" in str(exc_info.value)
+    assert "Last value: 1" in str(exc_info.value)
+
+
+async def test_expect_poll_should_report_callback_error() -> None:
+    async def callback() -> None:
+        raise ValueError("boom")
+
+    with pytest.raises(AssertionError) as exc_info:
+        await expect.poll(callback, timeout=50, intervals=[10]).to_be(1)
+    assert "Last error: boom" in str(exc_info.value)
+
+
+async def test_expect_poll_should_support_additional_matchers() -> None:
+    await expect.poll(lambda: "alpha-beta").to_match(re.compile(r"alpha"))
+    await expect.poll(lambda: "alpha-beta").to_match("beta")
+    await expect.poll(lambda: "alpha-beta").to_start_with("alpha")
+    await expect.poll(lambda: "alpha-beta").to_end_with("beta")
+    await expect.poll(lambda: [1, 2, 3]).to_have_length(3)
+    await expect.poll(lambda: None).to_be_none()
+    await expect.poll(lambda: None).to_be_null()
+    await expect.poll(lambda: 1).to_be_defined()
+    await expect.poll(lambda: 1.234).to_be_close_to(1.23, 2)
+    await expect.poll(lambda: math.nan).to_be_nan()
+    await expect.poll(lambda: "hello").to_be_instance_of(str)
+    await expect.poll(lambda: "").not_to_be_truthy()
+    await expect.poll(lambda: "x").not_to_be_falsy()
